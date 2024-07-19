@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notes App</title>
+    <style>
+      body {
+          font-family: Arial, sans-serif;
+      }
+      .note-form, .login-form, .registration-form, .search-form, .label-form, .notes-list {
+          margin: 20px;
+      }
+      .note-form input,
+      .note-form textarea,
+      .login-form input,
+      .registration-form input,
+      .search-form input,
+      .label-form select {
+          display: block;
+          margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-form">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email" required />
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Password"
+          required
+        />
+        <button type="submit">Login</button>
+      </form>
+      <p>
+        Don't have an account?
+        <a href="#" onclick="showRegistrationForm()">Register here</a>
+      </p>
+    </div>
+
+    <div class="registration-form" style="display:none;">
+      <h2>Register</h2>
+      <form id="registrationForm">
+        <input type="email" id="registerEmail" placeholder="Email" required />
+        <input
+          type="password"
+          id="registerPassword"
+          placeholder="Password"
+          required
+        />
+        <button type="submit">Register</button>
+      </form>
+      <p>
+        Already have an account?
+        <a href="#" onclick="showLoginForm()">Login here</a>
+      </p>
+    </div>
+
+    <div class="search-form" style="display:none;">
+      <h2>Search Notes</h2>
+      <form id="searchForm">
+        <input
+          type="text"
+          id="searchQuery"
+          placeholder="Search notes"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+    </div>
+
+    <div class="label-form" style="display:none;">
+      <h2>Filter Notes by Label</h2>
+      <form id="labelForm">
+        <select id="labelSelect">
+          <!-- Options will be populated dynamically -->
+        </select>
+        <button type="submit">Filter</button>
+      </form>
+    </div>
+
+    <div class="note-form" style="display:none;">
+      <h2>Create a New Note</h2>
+      <form id="noteForm">
+        <input type="text" id="title" placeholder="Title" required />
+        <textarea id="content" placeholder="Content" required></textarea>
+        <input
+          type="text"
+          id="tags"
+          placeholder="Tags (comma separated, up to 9)"
+        />
+        <input type="color" id="color" value="#ffffff" />
+        <button type="submit">Create Note</button>
+      </form>
+    </div>
+
+    <div class="notes-list" style="display:none;">
+      <h2>Notes</h2>
+      <ul id="notesList"></ul>
+    </div>
+
+    <script>
+      function showRegistrationForm() {
+          document.querySelector('.login-form').style.display = 'none';
+          document.querySelector('.registration-form').style.display = 'block';
+      }
+
+      function showLoginForm() {
+          document.querySelector('.registration-form').style.display = 'none';
+          document.querySelector('.login-form').style.display = 'block';
+      }
+
+      // Handle registration form submission
+      document.getElementById('registrationForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const email = document.getElementById('registerEmail').value;
+          const password = document.getElementById('registerPassword').value;
+
+          fetch('/api/auth/register', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ email, password })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.message === 'User registered successfully') {
+                  alert('Registration successful! Please log in.');
+                  showLoginForm();
+              } else {
+                  alert('Registration failed: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      });
+
+      // Handle login form submission
+      document.getElementById('loginForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const email = document.getElementById('loginEmail').value;
+          const password = document.getElementById('loginPassword').value;
+
+          fetch('/api/auth/login', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ email, password })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.token) {
+                  // Store token in local storage
+                  localStorage.setItem('token', data.token);
+                  // Hide login form and show note form, search form, and label form
+                  document.querySelector('.login-form').style.display = 'none';
+                  document.querySelector('.registration-form').style.display = 'none';
+                  document.querySelector('.note-form').style.display = 'block';
+                  document.querySelector('.search-form').style.display = 'block';
+                  document.querySelector('.label-form').style.display = 'block';
+
+                  // Load labels
+                  loadLabels();
+              } else {
+                  alert('Login failed: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      });
+
+      // Handle note form submission
+      document.getElementById('noteForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const title = document.getElementById('title').value;
+          const content = document.getElementById('content').value;
+          const tags = document.getElementById('tags').value;
+          const color = document.getElementById('color').value;
+
+          const noteData = {
+              title,
+              content,
+              tags,
+              color
+          };
+
+          fetch('/api/notes', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + localStorage.getItem('token')
+              },
+              body: JSON.stringify(noteData)
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.message === 'Note created successfully') {
+                  alert('Note created!');
+                  // Optionally, clear the form
+                  document.getElementById('noteForm').reset();
+              } else {
+                
+                  alert('Error creating note: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      });
+
+      // Handle search form submission
+      document.getElementById('searchForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const query = document.getElementById('searchQuery').value;
+
+          fetch('/api/notes/search?q=' + encodeURIComponent(query), {
+              method: 'GET',
+              headers: {
+                  'Authorization': 'Bearer ' + localStorage.getItem('token')
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.notes) {
+                  // Display the notes
+                  displayNotes(data.notes);
+              } else {
+                  alert('Error searching notes: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      });
+
+      // Handle label form submission
+      document.getElementById('labelForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+
+          const label = document.getElementById('labelSelect').value;
+
+          fetch('/api/notes/label/' + encodeURIComponent(label), {
+              method: 'GET',
+              headers: {
+                  'Authorization': 'Bearer ' + localStorage.getItem('token')
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.notes) {
+                  // Display the notes
+                  displayNotes(data.notes);
+              } else {
+                  alert('Error fetching notes with label: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      });
+
+      // Function to load labels from notes
+      function loadLabels() {
+          fetch('/api/notes', {
+              method: 'GET',
+              headers: {
+                  'Authorization': 'Bearer ' + localStorage.getItem('token')
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.notes) {
+                  const labels = new Set();
+                  data.notes.forEach(note => {
+                      if (note.tags) {
+                          const noteLabels = note.tags.split(',');
+                          noteLabels.forEach(label => labels.add(label.trim()));
+                      }
+                  });
+
+                  const labelSelect = document.getElementById('labelSelect');
+                  labels.forEach(label => {
+                      const option = document.createElement('option');
+                      option.value = label;
+                      option.textContent = label;
+                      labelSelect.appendChild(option);
+                  });
+              } else {
+                  alert('Error loading notes: ' + data.message);
+              }
+          })
+          .catch(error => {
+              console.error('Error:', error);
+          });
+      }
+
+      // Function to display notes
+      function displayNotes(notes) {
+          const notesList = document.getElementById('notesList');
+          notesList.innerHTML = '';
+          notes.forEach(note => {
+              const noteItem = document.createElement('li');
+              noteItem.textContent = `${note.title}: ${note.content}`;
+              notesList.appendChild(noteItem);
+          });
+          document.querySelector('.notes-list').style.display = 'block';
+      }
+    </script>
+  </body>
+</html>
